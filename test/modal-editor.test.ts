@@ -797,7 +797,7 @@ describe("ex mini-mode", () => {
 
 describe("cursor shape rendering", () => {
   it("writes insert cursor shape and strips the EOL software cursor", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     focusEditor(editor);
 
@@ -813,7 +813,7 @@ describe("cursor shape rendering", () => {
   });
 
   it("preserves the character under the insert cursor", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     for (const char of "abc") {
       editor.handleInput(char);
@@ -833,7 +833,7 @@ describe("cursor shape rendering", () => {
   });
 
   it("writes normal block cursor shape and strips the software cursor", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     sendKeys(editor, ["a", "b", "\x1b"]);
     focusEditor(editor);
@@ -847,7 +847,7 @@ describe("cursor shape rendering", () => {
   });
 
   it("writes EX block cursor shape and preserves EX label rendering", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     sendKeys(editor, ["\x1b", ":"]);
     focusEditor(editor);
@@ -863,7 +863,7 @@ describe("cursor shape rendering", () => {
   });
 
   it("caches repeated renders and writes only changed cursor shapes", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     focusEditor(editor);
 
@@ -895,8 +895,32 @@ describe("cursor shape rendering", () => {
     assertNoCursorShapeSequences(lines);
   });
 
+  it("preserves the software cursor while supported hardware cursor display is disabled", () => {
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: false });
+    const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
+    focusEditor(editor);
+
+    const disabledLines = editor.render(20);
+    const disabledMarkerLine = findCursorMarkerLine(disabledLines);
+
+    assert.deepEqual(tui.terminalWrites, []);
+    assert.equal(tui.getShowHardwareCursorCalls, 1);
+    assert.equal(disabledMarkerLine.includes(SOFTWARE_CURSOR_SPACE), true);
+    assertNoCursorShapeSequences(disabledLines);
+
+    tui.setShowHardwareCursor?.(true);
+    const enabledLines = editor.render(20);
+    const enabledMarkerLine = findCursorMarkerLine(enabledLines);
+
+    assert.deepEqual(tui.hardwareCursorValues, [true]);
+    assert.deepEqual(tui.terminalWrites, [INSERT_CURSOR_SHAPE]);
+    assert.equal(tui.getShowHardwareCursorCalls, 2);
+    assert.equal(enabledMarkerLine.includes(SOFTWARE_CURSOR_SPACE), false);
+    assertNoCursorShapeSequences(enabledLines);
+  });
+
   it("keeps the software cursor when focused render has no cursor marker", () => {
-    const tui = createCursorShapeTui();
+    const tui = createCursorShapeTui({ initialShowHardwareCursor: true });
     const editor = new ModalEditor(tui, stubTheme, stubKeybindings);
     const internal = editor as unknown as { autocompleteState?: string | null };
     internal.autocompleteState = "regular";
