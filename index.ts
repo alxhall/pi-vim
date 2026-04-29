@@ -57,6 +57,7 @@ import {
   resolveWordTextObjectRange,
   type TextObjectKind,
   type TextObjectRange,
+  type WordTextObjectClass,
 } from "./text-objects.js";
 
 const BRACKETED_PASTE_START = "\x1b[200~";
@@ -1292,7 +1293,7 @@ export class ModalEditor extends CustomEditor {
   }
 
   private handlePendingTextObject(data: string): void {
-    if (data !== "w") {
+    if (data !== "w" && data !== "W") {
       this.pendingTextObject = null;
       this.cancelPendingOperator(data);
       return;
@@ -1305,8 +1306,9 @@ export class ModalEditor extends CustomEditor {
       return;
     }
 
+    const semanticClass: WordTextObjectClass = data === "W" ? "WORD" : "word";
     const count = this.takeTotalCount(1);
-    const range = this.getWordObjectRange(pendingTextObject, count);
+    const range = this.getWordObjectRange(pendingTextObject, count, semanticClass);
     if (!range || !this.pendingOperator) {
       this.pendingOperator = null;
       return;
@@ -2774,6 +2776,7 @@ export class ModalEditor extends CustomEditor {
   private getWordObjectRange(
     kind: TextObjectKind,
     count: number = 1,
+    semanticClass: WordTextObjectClass = "word",
   ): TextObjectRange | null {
     const lines = this.getLines();
     const cursor = this.getCursor();
@@ -2786,6 +2789,7 @@ export class ModalEditor extends CustomEditor {
       cursor.col,
       kind,
       count,
+      semanticClass,
     );
   }
 

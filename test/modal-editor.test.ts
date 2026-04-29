@@ -2269,6 +2269,107 @@ describe("word text objects — iw / aw", () => {
 });
 
 // ---------------------------------------------------------------------------
+// WORD text objects — iW / aW with d/c/y
+// ---------------------------------------------------------------------------
+
+describe("WORD text objects — iW / aW", () => {
+  it("ciW changes a punctuation-containing WORD and enters insert mode", () => {
+    const { editor } = createEditorWithSpy("foo path/to-file bar");
+
+    setInternalCursor(editor, 4);
+    sendKeys(editor, ["c", "i", "W"]);
+
+    assert.equal(editor.getRegister(), "path/to-file");
+    assert.equal(editor.getText(), "foo  bar");
+    assert.equal(editor.getMode(), "insert");
+  });
+
+  it("diW deletes a flag WORD without surrounding whitespace", () => {
+    const { editor } = createEditorWithSpy("foo --flag=value bar");
+
+    setInternalCursor(editor, 4);
+    sendKeys(editor, ["d", "i", "W"]);
+
+    assert.equal(editor.getRegister(), "--flag=value");
+    assert.equal(editor.getText(), "foo  bar");
+  });
+
+  it("yiW yanks a WORD without mutation", () => {
+    const { editor } = createEditorWithSpy("foo path/to-file bar");
+    const before = editor.getText();
+
+    setInternalCursor(editor, 4);
+    sendKeys(editor, ["y", "i", "W"]);
+
+    assert.equal(editor.getRegister(), "path/to-file");
+    assert.equal(editor.getText(), before);
+  });
+
+  it("daW includes trailing whitespace when present", () => {
+    const { editor } = createEditorWithSpy("foo path/to-file bar");
+
+    setInternalCursor(editor, 4);
+    sendKeys(editor, ["d", "a", "W"]);
+
+    assert.equal(editor.getRegister(), "path/to-file ");
+    assert.equal(editor.getText(), "foo bar");
+  });
+
+  it("daW includes leading whitespace when no trailing whitespace exists", () => {
+    const { editor } = createEditorWithSpy("foo path/to-file");
+
+    setInternalCursor(editor, 4);
+    sendKeys(editor, ["d", "a", "W"]);
+
+    assert.equal(editor.getRegister(), " path/to-file");
+    assert.equal(editor.getText(), "foo");
+  });
+
+  it("d2iW and d2aW count WORDs using word-object whitespace policy", () => {
+    const { editor: inner } = createEditorWithSpy("foo path/to-file --flag=value bar");
+    const { editor: around } = createEditorWithSpy("foo path/to-file --flag=value bar");
+
+    setInternalCursor(inner, 4);
+    sendKeys(inner, ["d", "2", "i", "W"]);
+
+    assert.equal(inner.getRegister(), "path/to-file --flag=value");
+    assert.equal(inner.getText(), "foo  bar");
+
+    setInternalCursor(around, 4);
+    sendKeys(around, ["d", "2", "a", "W"]);
+
+    assert.equal(around.getRegister(), "path/to-file --flag=value ");
+    assert.equal(around.getText(), "foo bar");
+  });
+
+  it("chooses next WORD from whitespace or previous WORD when there is no next WORD", () => {
+    const { editor: next } = createEditorWithSpy("foo   path/to-file");
+    const { editor: previous } = createEditorWithSpy("foo/path   ");
+
+    setInternalCursor(next, 3);
+    sendKeys(next, ["d", "i", "W"]);
+
+    assert.equal(next.getRegister(), "path/to-file");
+    assert.equal(next.getText(), "foo   ");
+
+    setInternalCursor(previous, 8);
+    sendKeys(previous, ["d", "i", "W"]);
+
+    assert.equal(previous.getRegister(), "foo/path");
+    assert.equal(previous.getText(), "   ");
+  });
+
+  it("does not cross logical lines", () => {
+    const { editor } = createMultiLineEditor("foo/path\nbar/baz");
+
+    sendKeys(editor, ["d", "2", "i", "W"]);
+
+    assert.equal(editor.getRegister(), "foo/path");
+    assert.equal(editor.getText(), "\nbar/baz");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Single-key edit commands — x / s / S / D / C
 // ---------------------------------------------------------------------------
 
