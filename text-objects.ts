@@ -15,19 +15,7 @@ export type DelimiterSpec = {
 
 export type MatchingPairKind = "()" | "[]" | "{}";
 
-export type MatchingPairMotionTarget = {
-  pair: MatchingPairKind;
-  sourceAbs: number;
-  targetAbs: number;
-  rangeAnchorAbs: number;
-};
-
-type MatchingPairDelimiter = {
-  pair: MatchingPairKind;
-  open: string;
-  close: string;
-  side: "open" | "close";
-};
+export type MatchingPairMotionTarget={pair:MatchingPairKind;sourceAbs:number;targetAbs:number;rangeAnchorAbs:number;};
 
 function normalizeCount(count: number): number {
   if (!Number.isFinite(count) || count < 1) return 1;
@@ -93,24 +81,7 @@ function isWhitespace(ch: string | undefined): boolean {
   return ch !== undefined && /\s/.test(ch);
 }
 
-function getMatchingPairDelimiter(ch: string | undefined): MatchingPairDelimiter | null {
-  switch (ch) {
-    case "(":
-      return { pair: "()", open: "(", close: ")", side: "open" };
-    case ")":
-      return { pair: "()", open: "(", close: ")", side: "close" };
-    case "[":
-      return { pair: "[]", open: "[", close: "]", side: "open" };
-    case "]":
-      return { pair: "[]", open: "[", close: "]", side: "close" };
-    case "{":
-      return { pair: "{}", open: "{", close: "}", side: "open" };
-    case "}":
-      return { pair: "{}", open: "{", close: "}", side: "close" };
-    default:
-      return null;
-  }
-}
+function pairKind(ch?:string):MatchingPairKind|null{return ch==="("||ch===")"?"()":ch==="["||ch==="]"?"[]":ch==="{"||ch==="}"?"{}":null;}
 
 export function normalizeDelimiterKey(key: string): DelimiterSpec | null {
   if (key === '"' || key === "'" || key === "`") {
@@ -144,7 +115,6 @@ export function normalizeDelimiterKey(key: string): DelimiterSpec | null {
       close: "}",
     };
   }
-
   return null;
 }
 
@@ -262,80 +232,28 @@ export function resolveBracketObjectRange(
   };
 }
 
-function findMatchingPairTargetAbs(
-  text: string,
-  sourceAbs: number,
-  delimiter: MatchingPairDelimiter,
-): number | null {
-  const openStack: number[] = [];
-
-  for (let index = 0; index < text.length; index++) {
-    const ch = text[index];
-
-    if (ch === delimiter.open) {
-      openStack.push(index);
-      continue;
+export function resolveMatchingPairMotionTarget(text: string, c: number, l: number, e: number): MatchingPairMotionTarget | null {
+  if (!text.length || l >= e) return null;
+  const eol = c >= e;
+  let s = eol ? e - 1 : Math.max(c, l);
+  const a = eol ? s : c;
+  let pair = pairKind(text[s]);
+  for (let i = s + 1; !eol && !pair && i < e; i++) {
+    pair = pairKind(text[i]);
+    if (pair) s = i;
+  }
+  if (!pair) return null;
+  const st: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === pair[0]) st.push(i);
+    else if (text[i] === pair[1]) {
+      const o = st.pop();
+      if (o === s) return {pair, sourceAbs: s, targetAbs: i, rangeAnchorAbs: a};
+      if (i === s && o !== undefined) return {pair, sourceAbs: s, targetAbs: o, rangeAnchorAbs: a};
     }
-
-    if (ch !== delimiter.close) continue;
-
-    const openIndex = openStack.pop();
-    if (openIndex === undefined) {
-      if (delimiter.side === "close" && index === sourceAbs) return null;
-      continue;
-    }
-
-    if (delimiter.side === "open" && openIndex === sourceAbs) return index;
-    if (delimiter.side === "close" && index === sourceAbs) return openIndex;
   }
 
   return null;
-}
-
-export function resolveMatchingPairMotionTarget(
-  text: string,
-  cursorAbs: number,
-  currentLineStartAbs: number,
-  currentLineEndAbs: number,
-): MatchingPairMotionTarget | null {
-  if (text.length === 0 || currentLineStartAbs >= currentLineEndAbs) return null;
-
-  let sourceAbs: number | null = null;
-  let delimiter: MatchingPairDelimiter | null = null;
-  let rangeAnchorAbs = cursorAbs;
-
-  if (cursorAbs >= currentLineEndAbs) {
-    sourceAbs = currentLineEndAbs - 1;
-    delimiter = getMatchingPairDelimiter(text[sourceAbs]);
-    rangeAnchorAbs = sourceAbs;
-  } else {
-    const scanStartAbs = Math.max(cursorAbs, currentLineStartAbs);
-    delimiter = getMatchingPairDelimiter(text[scanStartAbs]);
-
-    if (delimiter !== null) {
-      sourceAbs = scanStartAbs;
-    } else {
-      for (let index = scanStartAbs + 1; index < currentLineEndAbs; index++) {
-        delimiter = getMatchingPairDelimiter(text[index]);
-        if (delimiter === null) continue;
-
-        sourceAbs = index;
-        break;
-      }
-    }
-  }
-
-  if (sourceAbs === null || delimiter === null) return null;
-
-  const targetAbs = findMatchingPairTargetAbs(text, sourceAbs, delimiter);
-  if (targetAbs === null) return null;
-
-  return {
-    pair: delimiter.pair,
-    sourceAbs,
-    targetAbs,
-    rangeAnchorAbs,
-  };
 }
 
 export function resolveDelimitedTextObjectRange(
