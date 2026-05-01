@@ -15,7 +15,7 @@ export type DelimiterSpec = {
 
 export type MatchingPairKind = "()" | "[]" | "{}";
 
-export type MatchingPairMotionTarget={pair:MatchingPairKind;sourceAbs:number;targetAbs:number;rangeAnchorAbs:number;};
+export type MatchingPairMotionTarget = { pair: MatchingPairKind; sourceAbs: number; targetAbs: number; rangeAnchorAbs: number };
 
 function normalizeCount(count: number): number {
   if (!Number.isFinite(count) || count < 1) return 1;
@@ -49,23 +49,7 @@ function findLogicalLineBounds(
   const start = line.lastIndexOf("\n", previousSearchStart) + 1;
   const nextNewline = line.indexOf("\n", cursorCol);
 
-  return {
-    start,
-    end: nextNewline === -1 ? line.length : nextNewline,
-  };
-}
-
-function findCurrentLineBounds(
-  text: string,
-  cursorAbs: number,
-): { startAbs: number; endAbs: number } {
-  const cursor = clampCursorAbs(text, cursorAbs);
-  const bounds = findLogicalLineBounds(text, cursor);
-
-  return {
-    startAbs: bounds.start,
-    endAbs: bounds.end,
-  };
+  return { start, end: nextNewline === -1 ? line.length : nextNewline };
 }
 
 function isWordTextObjectChar(
@@ -81,43 +65,33 @@ function isWhitespace(ch: string | undefined): boolean {
   return ch !== undefined && /\s/.test(ch);
 }
 
-function pairKind(ch?:string):MatchingPairKind|null{return ch==="("||ch===")"?"()":ch==="["||ch==="]"?"[]":ch==="{"||ch==="}"?"{}":null;}
+function pairKind(ch?: string): MatchingPairKind | null {
+  return ch === "(" || ch === ")" ? "()" : ch === "[" || ch === "]" ? "[]" : ch === "{" || ch === "}" ? "{}" : null;
+}
 
-function scanSameDelimiterPairs(text:string,open:string,close:string,onPair:(openAbs:number,closeAbs:number)=>number|null):number|null{const st:number[]=[];for(let i=0;i<text.length;i++){if(text[i]===open)st.push(i);else if(text[i]===close){const o=st.pop();if(o===undefined)continue;const r=onPair(o,i);if(r!==null)return r;}}return null;}
-
-export function normalizeDelimiterKey(key: string): DelimiterSpec | null {
-  if (key === '"' || key === "'" || key === "`") {
-    return {
-      type: "quote",
-      open: key,
-      close: key,
-    };
-  }
-
-  if (key === "(" || key === ")" || key === "b") {
-    return {
-      type: "bracket",
-      open: "(",
-      close: ")",
-    };
-  }
-
-  if (key === "[" || key === "]") {
-    return {
-      type: "bracket",
-      open: "[",
-      close: "]",
-    };
-  }
-
-  if (key === "{" || key === "}" || key === "B") {
-    return {
-      type: "bracket",
-      open: "{",
-      close: "}",
-    };
+function scanSameDelimiterPairs(
+  text: string,
+  open: string,
+  close: string,
+  onPair: (openAbs: number, closeAbs: number) => number | null,
+): number | null {
+  const stack: number[] = [];
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === open) stack.push(index);
+    else if (text[index] === close) {
+      const openAbs = stack.pop();
+      if (openAbs === undefined) continue;
+      const targetAbs = onPair(openAbs, index);
+      if (targetAbs !== null) return targetAbs;
+    }
   }
   return null;
+}
+
+export function normalizeDelimiterKey(key: string): DelimiterSpec | null {
+  if (key === "\"" || key === "'" || key === "`") return { type: "quote", open: key, close: key };
+  const pair = key === "(" || key === ")" || key === "b" ? "()" : key === "[" || key === "]" ? "[]" : key === "{" || key === "}" || key === "B" ? "{}" : null;
+  return pair ? { type: "bracket", open: pair[0], close: pair[1] } : null;
 }
 
 export function isEscapedDelimiter(text: string, index: number): boolean {
@@ -142,13 +116,13 @@ export function resolveQuoteObjectRange(
   if (spec?.type !== "quote") return null;
 
   const cursor = clampCursorAbs(text, cursorAbs);
-  const bounds = findCurrentLineBounds(text, cursor);
-  if (bounds.startAbs >= bounds.endAbs) return null;
+  const bounds = findLogicalLineBounds(text, cursor);
+  if (bounds.start >= bounds.end) return null;
 
   let openIndex: number | null = null;
   let bestPair: { open: number; close: number } | null = null;
 
-  for (let index = bounds.startAbs; index < bounds.endAbs; index++) {
+  for (let index = bounds.start; index < bounds.end; index++) {
     if (text[index] !== quote || isEscapedDelimiter(text, index)) continue;
 
     if (openIndex === null) {
@@ -156,13 +130,9 @@ export function resolveQuoteObjectRange(
       continue;
     }
 
-    const closeIndex = index;
-    if (openIndex <= cursor && cursor <= closeIndex) {
-      if (
-        bestPair === null ||
-        closeIndex - openIndex < bestPair.close - bestPair.open
-      ) {
-        bestPair = { open: openIndex, close: closeIndex };
+    if (openIndex <= cursor && cursor <= index) {
+      if (bestPair === null || index - openIndex < bestPair.close - bestPair.open) {
+        bestPair = { open: openIndex, close: index };
       }
     }
     openIndex = null;
@@ -222,19 +192,25 @@ export function resolveBracketObjectRange(
   };
 }
 
-export function resolveMatchingPairMotionTarget(text: string, c: number, l: number, e: number): MatchingPairMotionTarget | null {
-  if (!text.length || l >= e) return null;
-  const eol = c >= e;
-  let s = eol ? e - 1 : Math.max(c, l);
-  const a = eol ? s : c;
-  let pair = pairKind(text[s]);
-  for (let i = s + 1; !eol && !pair && i < e; i++) {
-    pair = pairKind(text[i]);
-    if (pair) s = i;
+export function resolveMatchingPairMotionTarget(
+  text: string,
+  cursorAbs: number,
+  currentLineStartAbs: number,
+  currentLineEndAbs: number,
+): MatchingPairMotionTarget | null {
+  const start = currentLineStartAbs, end = currentLineEndAbs;
+  if (!text.length || start >= end) return null;
+  const visibleEol = cursorAbs >= end;
+  let sourceAbs = visibleEol ? end - 1 : Math.max(cursorAbs, start);
+  const rangeAnchorAbs = visibleEol ? sourceAbs : cursorAbs;
+  let pair = pairKind(text[sourceAbs]);
+  for (let index = sourceAbs + 1; !visibleEol && !pair && index < end; index++) {
+    pair = pairKind(text[index]);
+    if (pair) sourceAbs = index;
   }
   if (!pair) return null;
-  const t = scanSameDelimiterPairs(text, pair[0], pair[1], (o, i) => (o === s ? i : i === s ? o : null));
-  if (t !== null) return {pair, sourceAbs: s, targetAbs: t, rangeAnchorAbs: a};
+  const targetAbs = scanSameDelimiterPairs(text, pair[0], pair[1], (openAbs, closeAbs) => openAbs === sourceAbs ? closeAbs : closeAbs === sourceAbs ? openAbs : null);
+  if (targetAbs !== null) return { pair, sourceAbs, targetAbs, rangeAnchorAbs };
 
   return null;
 }
