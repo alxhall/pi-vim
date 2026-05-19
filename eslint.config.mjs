@@ -7,6 +7,7 @@ export default tseslint.config(
       "doc/**",
       ".pi/**",
       ".tree/**",
+      ".tmp/**",
       "node_modules/**",
       "*.js",
       "*.sh",
