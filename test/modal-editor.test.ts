@@ -1455,6 +1455,50 @@ describe("mode color settings", () => {
     }
   });
 
+  it("syncBorderColorWithMode true survives Pi host borderColor assignment", async () => {
+    const theme = createRecordingTheme();
+    const restore = setPiVimSettingsReaderForTests(() => ({
+      modeColors: {
+        insert: "insertToken",
+        normal: "normalToken",
+        ex: "exToken",
+      },
+      syncBorderColorWithMode: true,
+    }));
+
+    try {
+      const extension = await installExtensionWithEditorFactory(theme);
+      const editor = extension.editorFactory(
+        stubTui,
+        stubTheme,
+        stubKeybindings,
+      );
+      const defaultEditorBorderColor = (text: string) =>
+        `<hostBorder>${text}</hostBorder>`;
+
+      // Pi's InteractiveMode.setCustomEditorComponent copies the default
+      // editor's borderColor onto the extension editor after the factory
+      // returns. The mode-aware border hook must survive that assignment.
+      editor.borderColor = defaultEditorBorderColor;
+
+      assert.equal(
+        editor.borderColor("border"),
+        "<insertToken>border</insertToken>",
+      );
+
+      sendKeys(editor, ["\x1b"]);
+      assert.equal(
+        editor.borderColor("border"),
+        "<normalToken>border</normalToken>",
+      );
+
+      sendKeys(editor, [":"]);
+      assert.equal(editor.borderColor("border"), "<exToken>border</exToken>");
+    } finally {
+      restore();
+    }
+  });
+
   for (const [name, commandKeys] of [
     ["i", ["i"]],
     ["a", ["a"]],

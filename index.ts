@@ -701,11 +701,15 @@ export class ModalEditor extends CustomEditor {
 
   private installModeBorderColorizer(): void {
     if (!this.borderColorizers) return;
-    const baseBorderColor = this.borderColor;
-    this.borderColor = (text: string) => {
-      const colorize = this.borderColorizers?.[this.getActiveMode()];
-      return colorize ? colorize(text) : baseBorderColor(text);
-    };
+    let base = this.borderColor;
+    const modeBorderColor = (text: string) =>
+      (this.borderColorizers?.[this.getActiveMode()] ?? base)(text);
+    Object.defineProperty(this, "borderColor", {
+      get: () => modeBorderColor,
+      set(next: unknown) {
+        if (typeof next === "function") base = next as typeof base;
+      },
+    });
   }
 
   private setMode(mode: Mode = "insert"): void {
