@@ -107,6 +107,7 @@ type ModalEditorOptions = {
   labelColorizers?: ModeColorizers | null;
   borderColorizers?: ModeColorizers | null;
 };
+type ModalEditorConstructorOptions = ModalEditorOptions | ModeColorizers;
 type ThemeLike = { fg(token: string, text: string): string };
 
 type CursorShapeSequence =
@@ -159,6 +160,22 @@ function buildModeColorizers(
     normal: colorizer("normal"),
     ex: colorizer("ex"),
   };
+}
+function isModeColorizerMap(
+  opts: ModalEditorConstructorOptions,
+): opts is ModeColorizers {
+  const candidate = opts as Partial<Record<ModeColorKey, unknown>>;
+  return (
+    typeof candidate.insert === "function" &&
+    typeof candidate.normal === "function" &&
+    typeof candidate.ex === "function"
+  );
+}
+function normalizeModalEditorOptions(
+  opts: ModalEditorConstructorOptions | undefined,
+): ModalEditorOptions {
+  if (!opts) return {};
+  return isModeColorizerMap(opts) ? { labelColorizers: opts } : opts;
 }
 
 type CursorShapeTuiCandidate = {
@@ -646,12 +663,13 @@ export class ModalEditor extends CustomEditor {
     tui: CustomEditorConstructorArgs[0],
     theme: CustomEditorConstructorArgs[1],
     kb: CustomEditorConstructorArgs[2],
-    opts?: ModalEditorOptions,
+    opts?: ModalEditorConstructorOptions,
   ) {
     super(tui, theme, kb);
+    const editorOptions = normalizeModalEditorOptions(opts);
     this.cursorShapeRuntime = getCursorShapeRuntime(tui);
-    this.labelColorizers = opts?.labelColorizers ?? null;
-    this.borderColorizers = opts?.borderColorizers ?? null;
+    this.labelColorizers = editorOptions.labelColorizers ?? null;
+    this.borderColorizers = editorOptions.borderColorizers ?? null;
     this.installModeBorderColorizer();
   }
 
@@ -705,6 +723,8 @@ export class ModalEditor extends CustomEditor {
     const modeBorderColor = (text: string) =>
       (this.borderColorizers?.[this.getActiveMode()] ?? base)(text);
     Object.defineProperty(this, "borderColor", {
+      configurable: true,
+      enumerable: true,
       get: () => modeBorderColor,
       set(next: unknown) {
         if (typeof next === "function") base = next as typeof base;

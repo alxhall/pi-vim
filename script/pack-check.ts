@@ -65,10 +65,10 @@ const FORBIDDEN_REGEX_BY_GLOB: Record<
 
 const THRESHOLDS = {
   maxFiles: 12,
-  // WORD/delimited text objects plus the settings module add packaged surface.
+  // WORD/delimited text objects plus public compatibility shims add package surface.
   // Keep budgets tight enough to catch accidental docs/tests in the package.
-  maxSize: 31100,
-  maxUnpackedSize: 139000,
+  maxSize: 31300,
+  maxUnpackedSize: 139500,
 } as const;
 
 function compareStrings(a: string, b: string): number {
