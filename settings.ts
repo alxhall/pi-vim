@@ -44,11 +44,10 @@ export function readPiVimClipboardMirrorSetting(g: unknown, p: unknown) {
 }
 
 export function readPiVimModeColors(g: unknown, p: unknown) {
-  const r = {
-    ...colors(get(g, "modeColors")),
-    ...colors(get(p, "modeColors")),
-  };
-  return Object.keys(r)[0] ? r : undefined;
+  const v = get(p, "modeColors");
+  if (v !== M) return colors(v);
+  const w = get(g, "modeColors");
+  return colors(w);
 }
 
 export function readPiVimBooleanSetting(

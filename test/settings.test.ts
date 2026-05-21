@@ -71,7 +71,7 @@ describe("piVim mode color settings reader", () => {
     );
   });
 
-  it("merges project mode color settings over global per leaf", () => {
+  it("lets project modeColors override global as a setting", () => {
     assert.deepEqual(
       readPiVimModeColors(
         {
@@ -85,7 +85,43 @@ describe("piVim mode color settings reader", () => {
         },
         { piVim: { modeColors: { ex: "projectEx" } } },
       ),
-      { insert: "globalInsert", normal: "globalNormal", ex: "projectEx" },
+      { ex: "projectEx" },
+    );
+  });
+
+  it("does not fall back to global modeColors when project leaves are invalid", () => {
+    assert.deepEqual(
+      readPiVimModeColors(
+        {
+          piVim: {
+            modeColors: {
+              insert: "globalInsert",
+              normal: "globalNormal",
+              ex: "globalEx",
+            },
+          },
+        },
+        {
+          piVim: {
+            modeColors: {
+              insert: "projectInsert",
+              normal: 42,
+              ex: "red;evil",
+            },
+          },
+        },
+      ),
+      { insert: "projectInsert" },
+    );
+  });
+
+  it("treats malformed project modeColors as an override", () => {
+    assert.equal(
+      readPiVimModeColors(
+        { piVim: { modeColors: { insert: "globalInsert" } } },
+        { piVim: { modeColors: null } },
+      ),
+      undefined,
     );
   });
 });
